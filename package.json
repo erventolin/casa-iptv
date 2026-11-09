@@ -1,6 +1,6 @@
 {
   "name": "casa-iptv",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "description": "Reproductor IPTV M3U sencillo para TizenBrew",
   "license": "MIT",
   "packageType": "app",

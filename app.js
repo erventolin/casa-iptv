@@ -109,14 +109,27 @@
     var seen = {}, gs = [];
     channels.forEach(function (c) { if (!seen[c.group]) { seen[c.group] = 1; gs.push(c.group); } });
     gs.sort(function (a, b) { return a.localeCompare(b, "es"); });
-    groups = ["Todos", "★ Favoritos"].concat(gs);
+    groups = ["Todos", "★ Favoritos"].concat(gs, [SETTINGS]);
+  }
+  var SETTINGS = "⚙ Ajustes";
+  function settingsItems() {
+    var custom = load(LS_CUSTOM, "");
+    var items = [{ name: "Cambiar lista de canales", action: "setup" }];
+    if (custom) items.push({ name: "Volver a la lista por defecto", action: "reset" });
+    items.push({ name: "Lista actual: " + (custom || "por defecto (España)"), action: "none" });
+    return items;
   }
   function applyGroup() {
     var g = groups[groupIdx];
-    view = channels.filter(function (c) {
-      return g === "Todos" ? true : g === "★ Favoritos" ? !!favs[c.url] : c.group === g;
-    });
-    tabName.textContent = g + " (" + view.length + ")";
+    if (g === SETTINGS) {
+      view = settingsItems();
+      tabName.textContent = g;
+    } else {
+      view = channels.filter(function (c) {
+        return g === "Todos" ? true : g === "★ Favoritos" ? !!favs[c.url] : c.group === g;
+      });
+      tabName.textContent = g + " (" + view.length + ")";
+    }
     sel = Math.max(0, Math.min(sel, view.length - 1));
     render();
   }
@@ -136,51 +149,97 @@
   }
 
   // ---------- reproducción ----------
-  // Reproducción: hls.js (MSE) para HLS; si falla o no es HLS, el reproductor nativo de la tele.
-  var hls = null;
+  // Motores, en orden según el tipo de enlace:
+  //   .m3u8        -> hls.js -> nativo
+  //   .ts / otros  -> mpegts.js (MPEG-TS continuo) -> hls.js -> nativo
+  //   .mpd         -> nativo
+  // Si un motor da error fatal se pasa al siguiente; si fallan todos, se avisa.
+  var hls = null, mts = null, engine = "", playToken = null;
   function stopHls() {
     if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
+    if (mts) {
+      try { mts.pause(); mts.unload(); mts.detachMediaElement(); mts.destroy(); } catch (e) {}
+      mts = null;
+    }
   }
-  function playNative(url) {
-    stopHls();
-    video.removeAttribute("src");
-    video.src = url;
+  function kick() {
     var p = video.play();
     if (p && p.catch) p.catch(function () {});
   }
   function failed() {
     status("Este canal no funciona ahora mismo. Prueba otro.");
   }
+
+  function engineOrder(url) {
+    if (/\.mpd(\?|$)/i.test(url)) return ["native"];
+    if (/\.m3u8?(\?|$)/i.test(url)) return ["hls", "native"];
+    return ["mpegts", "hls", "native"];
+  }
+
+  var ENGINES = {
+    hls: {
+      ok: function () { return window.Hls && window.Hls.isSupported(); },
+      start: function (url, next) {
+        var recovered = false;
+        hls = new window.Hls({ enableWorker: true, lowLatencyMode: false, backBufferLength: 30 });
+        hls.on(window.Hls.Events.MANIFEST_PARSED, kick);
+        hls.on(window.Hls.Events.ERROR, function (ev, data) {
+          if (!data.fatal) return;
+          if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR && !recovered) { recovered = true; hls.recoverMediaError(); return; }
+          next();
+        });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+      }
+    },
+    mpegts: {
+      ok: function () { return window.mpegts && window.mpegts.isSupported(); },
+      start: function (url, next) {
+        mts = window.mpegts.createPlayer(
+          { type: "mpegts", isLive: true, url: url },
+          { enableWorker: true, enableStashBuffer: true, stashInitialSize: 128 * 1024,
+            liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: 6, liveBufferLatencyMinRemain: 1,
+            lazyLoad: false, autoCleanupSourceBuffer: true });
+        // diferido: no destruir el reproductor mientras aún está emitiendo el evento de error
+        mts.on(window.mpegts.Events.ERROR, function () { setTimeout(next, 0); });
+        mts.attachMediaElement(video);
+        mts.load();
+        kick();
+      }
+    },
+    native: {
+      ok: function () { return true; },
+      start: function (url) {
+        video.removeAttribute("src");
+        video.src = url;
+        kick();
+      }
+    }
+  };
+
   function play(c) {
     if (!c) return;
     playing = c.url;
     save(LS_LAST, c.url);
     status("Cargando " + c.name + "…");
     var url = c.url;
-    var isHls = !/\.mpd(\?|$)/i.test(url);
-    if (isHls && window.Hls && window.Hls.isSupported()) {
+    var order = engineOrder(url).filter(function (n) { return ENGINES[n].ok(); });
+    var i = -1, token = {};
+    playToken = token;
+    function next() {
+      if (playing !== url || playToken !== token) return;   // el usuario ya cambió de canal
       stopHls();
-      var triedNative = false, recovered = false;
-      hls = new window.Hls({ enableWorker: true, lowLatencyMode: false, backBufferLength: 30 });
-      hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
-        var p = video.play();
-        if (p && p.catch) p.catch(function () {});
-      });
-      hls.on(window.Hls.Events.ERROR, function (ev, data) {
-        if (!data.fatal || playing !== url) return;
-        if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR && !recovered) { recovered = true; hls.recoverMediaError(); return; }
-        if (!triedNative) { triedNative = true; playNative(url); } else failed();
-      });
-      hls.loadSource(url);
-      hls.attachMedia(video);
-    } else {
-      playNative(url);
+      i++;
+      if (i >= order.length) { engine = ""; return failed(); }
+      engine = order[i];
+      try { ENGINES[engine].start(url, next); } catch (e) { next(); }
     }
+    video.onerror = function () { if (playing === url && engine === "native") failed(); };
+    next();
     showOsd(c);
     render();
   }
   video.addEventListener("playing", function () { status(""); });
-  video.addEventListener("error", function () { if (!hls) failed(); });
 
   function showOsd(c) {
     var idx = view.indexOf(c);
@@ -234,14 +293,40 @@
     setupInput.blur();
     setupEl.className = "";
   }
-  function saveSetup() {
-    var url = setupInput.value.trim();
+  function saveSetup(forceUrl) {
+    var url = typeof forceUrl === "string" ? forceUrl : setupInput.value.trim();
     if (url && !/^https?:\/\//i.test(url)) url = "http://" + url;
     if (url) save(LS_CUSTOM, url); else { try { localStorage.removeItem(LS_CUSTOM); } catch (e) {} }
     try { localStorage.removeItem(LS_CACHE); localStorage.removeItem(LS_LAST); } catch (e) {}
     closeSetup();
     stopHls();
     location.reload();
+  }
+
+  function toggleFav(f) {
+    if (!f || !f.url) return;
+    if (favs[f.url]) delete favs[f.url]; else favs[f.url] = 1;
+    save(LS_FAVS, favs);
+    if (groups[groupIdx] === "★ Favoritos") applyGroup(); else render();
+  }
+  function activate(c) {
+    if (!c) return;
+    if (c.action === "setup") return openSetup();
+    if (c.action === "reset") return saveSetup("");
+    if (c.action) return;
+    if (c.url === playing) setFull(true); else play(c);
+  }
+
+  // OK = ver / pantalla completa. Mantener OK pulsado (la tele repite la tecla) = marcar/desmarcar favorito.
+  // No depende de keyup: se detectan las repeticiones automáticas de keydown.
+  var okLast = 0, okRepeats = 0, okFavDone = false;
+  function onOk() {
+    var now = Date.now();
+    var isRepeat = now - okLast < 300;
+    okLast = now;
+    if (!isRepeat) { okRepeats = 0; okFavDone = false; activate(view[sel]); return; }
+    okRepeats++;
+    if (okRepeats >= 3 && !okFavDone) { okFavDone = true; toggleFav(view[sel]); }
   }
 
   document.addEventListener("keydown", function (e) {
@@ -269,18 +354,8 @@
       case K.DOWN: if (view.length) sel = (sel + 1) % view.length; render(); break;
       case K.LEFT: groupIdx = (groupIdx - 1 + groups.length) % groups.length; sel = 0; applyGroup(); break;
       case K.RIGHT: groupIdx = (groupIdx + 1) % groups.length; sel = 0; applyGroup(); break;
-      case K.ENTER:
-        var c = view[sel];
-        if (!c) break;
-        if (c.url === playing) setFull(true); else play(c);
-        break;
-      case K.YELLOW:
-        var f = view[sel];
-        if (!f) break;
-        if (favs[f.url]) delete favs[f.url]; else favs[f.url] = 1;
-        save(LS_FAVS, favs);
-        if (groups[groupIdx] === "★ Favoritos") applyGroup(); else render();
-        break;
+      case K.ENTER: onOk(); break;
+      case K.YELLOW: toggleFav(view[sel]); break;
       case K.BACK: case K.ESC: exitApp(); break;
     }
   });
