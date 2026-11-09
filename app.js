@@ -133,21 +133,51 @@
   }
 
   // ---------- reproducción ----------
+  // Reproducción: hls.js (MSE) para HLS; si falla o no es HLS, el reproductor nativo de la tele.
+  var hls = null;
+  function stopHls() {
+    if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
+  }
+  function playNative(url) {
+    stopHls();
+    video.removeAttribute("src");
+    video.src = url;
+    var p = video.play();
+    if (p && p.catch) p.catch(function () {});
+  }
+  function failed() {
+    status("Este canal no funciona ahora mismo. Prueba otro.");
+  }
   function play(c) {
     if (!c) return;
     playing = c.url;
     save(LS_LAST, c.url);
     status("Cargando " + c.name + "…");
-    video.src = c.url;
-    var p = video.play();
-    if (p && p.catch) p.catch(function () {});
+    var url = c.url;
+    var isHls = !/\.mpd(\?|$)/i.test(url);
+    if (isHls && window.Hls && window.Hls.isSupported()) {
+      stopHls();
+      var triedNative = false, recovered = false;
+      hls = new window.Hls({ enableWorker: true, lowLatencyMode: false, backBufferLength: 30 });
+      hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
+        var p = video.play();
+        if (p && p.catch) p.catch(function () {});
+      });
+      hls.on(window.Hls.Events.ERROR, function (ev, data) {
+        if (!data.fatal || playing !== url) return;
+        if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR && !recovered) { recovered = true; hls.recoverMediaError(); return; }
+        if (!triedNative) { triedNative = true; playNative(url); } else failed();
+      });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+    } else {
+      playNative(url);
+    }
     showOsd(c);
     render();
   }
   video.addEventListener("playing", function () { status(""); });
-  video.addEventListener("error", function () {
-    status("Este canal no funciona ahora mismo. Prueba otro.");
-  });
+  video.addEventListener("error", function () { if (!hls) failed(); });
 
   function showOsd(c) {
     var idx = view.indexOf(c);
