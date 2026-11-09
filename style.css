@@ -28,5 +28,15 @@ html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0d111
   border-radius: 12px; font-size: 40px; display: none; }
 #osd-num { color: #2f81f7; margin-right: 18px; font-weight: 700; }
 
+#setup { position: absolute; inset: 0; left: 0; top: 0; width: 1920px; height: 1080px; display: none;
+  align-items: center; justify-content: center; background: rgba(0,0,0,.8); }
+#setup.show { display: flex; }
+#setup .box { width: 1200px; padding: 48px; background: #161b22; border: 2px solid #30363d; border-radius: 16px; }
+#setup h2 { font-size: 44px; margin-bottom: 20px; }
+#setup p { font-size: 28px; color: #c9d1d9; line-height: 1.4; }
+#setup input { width: 100%; margin: 28px 0; padding: 18px 22px; font-size: 32px; color: #fff; background: #0d1117;
+  border: 3px solid #2f81f7; border-radius: 10px; outline: none; }
+#setup .hint { color: #7d8590; font-size: 24px; }
+
 #app.full #side { margin-left: -560px; }
 #app.full #osd.show { display: block; }

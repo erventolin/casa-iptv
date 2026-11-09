@@ -1,10 +1,10 @@
 {
   "name": "casa-iptv",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Reproductor IPTV M3U sencillo para TizenBrew",
   "license": "MIT",
   "packageType": "app",
   "appName": "Casa IPTV",
   "appPath": "index.html",
-  "keys": ["ChannelUp", "ChannelDown", "ColorF2Yellow", "MediaPlayPause", "MediaPlay", "MediaPause"]
+  "keys": ["ChannelUp", "ChannelDown", "ColorF0Red", "ColorF2Yellow", "MediaPlayPause", "MediaPlay", "MediaPause"]
 }

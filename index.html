@@ -11,13 +11,22 @@
     <aside id="side">
       <div id="tabs"><span id="tab-prev">◀</span><span id="tab-name">Todos</span><span id="tab-next">▶</span></div>
       <ul id="list"></ul>
-      <div id="help">▲▼ canal · OK ver · ◀▶ grupo · Amarillo ★ favorito · Atrás salir</div>
+      <div id="help">▲▼ canal · OK ver · ◀▶ grupo · Amarillo ★ favorito · Rojo cambiar lista · Atrás salir</div>
     </aside>
     <main id="stage">
       <video id="video" autoplay></video>
       <div id="osd"><span id="osd-num"></span><span id="osd-name"></span></div>
       <div id="status">Cargando listas…</div>
     </main>
+  </div>
+  <div id="setup">
+    <div class="box">
+      <h2>Cambiar lista de canales</h2>
+      <p>Escribe o pega la dirección de la lista (.m3u / .m3u8) y pulsa OK.<br>
+         Déjala vacía y pulsa OK para volver a la lista por defecto.</p>
+      <input id="setup-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://…/lista.m3u">
+      <p class="hint">OK guardar · Atrás cancelar</p>
+    </div>
   </div>
   <script src="hls.min.js"></script>
   <script src="config.js"></script>

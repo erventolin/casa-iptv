@@ -5,6 +5,7 @@
   var LS_CACHE = "casaiptv:cache";
   var LS_FAVS = "casaiptv:favs";
   var LS_LAST = "casaiptv:last";
+  var LS_CUSTOM = "casaiptv:customUrl";
   var ROW_H = 76;
 
   var app = document.getElementById("app");
@@ -90,7 +91,9 @@
   }
 
   function loadPlaylists(done) {
-    var lists = CFG.playlists || [], pending = lists.length, all = [], errors = [];
+    var custom = load(LS_CUSTOM, "");
+    var lists = custom ? [{ name: "Mi lista", url: custom }] : (CFG.playlists || []);
+    var pending = lists.length, all = [], errors = [];
     if (!pending) return done(all, ["No hay listas en config.js"]);
     lists.forEach(function (pl, i) {
       get(pl.url, function (err, text) {
@@ -200,18 +203,55 @@
 
   // ---------- mando ----------
   var K = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, ENTER: 13, BACK: 10009, ESC: 27,
-            CH_UP: 427, CH_DOWN: 428, YELLOW: 405, PLAYPAUSE: 10252, PLAY: 415, PAUSE: 19 };
+            CH_UP: 427, CH_DOWN: 428, YELLOW: 405, RED: 403, PLAYPAUSE: 10252, PLAY: 415, PAUSE: 19,
+            IME_DONE: 65376, IME_CANCEL: 65385 };
   try {
-    ["ChannelUp", "ChannelDown", "ColorF2Yellow", "MediaPlayPause", "MediaPlay", "MediaPause"]
+    ["ChannelUp", "ChannelDown", "ColorF0Red", "ColorF2Yellow", "MediaPlayPause", "MediaPlay", "MediaPause"]
       .forEach(function (k) { window.tizen.tvinputdevice.registerKey(k); });
   } catch (e) {}
 
+  // Dentro de TizenBrew el módulo sustituye a la pantalla de TizenBrew en la misma ventana:
+  // "Atrás" debe volver a esa pantalla (history.back). Si no hay historial, cerrar la app.
   function exitApp() {
+    stopHls();
+    try { video.pause(); video.removeAttribute("src"); video.load(); } catch (e) {}
+    if (window.history.length > 1) { window.history.back(); return; }
     try { window.tizen.application.getCurrentApplication().exit(); } catch (e) {}
+  }
+
+  // ---------- cambiar lista (botón rojo) ----------
+  var setupEl = document.getElementById("setup");
+  var setupInput = document.getElementById("setup-url");
+  var setupOpen = false;
+  function openSetup() {
+    setupOpen = true;
+    setupInput.value = load(LS_CUSTOM, "");
+    setupEl.className = "show";
+    setTimeout(function () { setupInput.focus(); }, 50);
+  }
+  function closeSetup() {
+    setupOpen = false;
+    setupInput.blur();
+    setupEl.className = "";
+  }
+  function saveSetup() {
+    var url = setupInput.value.trim();
+    if (url && !/^https?:\/\//i.test(url)) url = "http://" + url;
+    if (url) save(LS_CUSTOM, url); else { try { localStorage.removeItem(LS_CUSTOM); } catch (e) {} }
+    try { localStorage.removeItem(LS_CACHE); localStorage.removeItem(LS_LAST); } catch (e) {}
+    closeSetup();
+    stopHls();
+    location.reload();
   }
 
   document.addEventListener("keydown", function (e) {
     var k = e.keyCode;
+    if (setupOpen) {
+      if (k === K.ENTER || k === K.IME_DONE) { e.preventDefault(); saveSetup(); }
+      else if (k === K.BACK || k === K.ESC || k === K.IME_CANCEL) { e.preventDefault(); closeSetup(); }
+      return; // el resto de teclas van al cuadro de texto
+    }
+    if (k === K.RED) return openSetup();
     if (k === K.CH_UP) return zap(-1);
     if (k === K.CH_DOWN) return zap(1);
     if (k === K.PLAYPAUSE || k === K.PLAY || k === K.PAUSE) {
