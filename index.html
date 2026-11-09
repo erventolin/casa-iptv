@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>Casa IPTV</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <aside id="side">
+      <div id="tabs"><span id="tab-prev">◀</span><span id="tab-name">Todos</span><span id="tab-next">▶</span></div>
+      <ul id="list"></ul>
+      <div id="help">▲▼ canal · OK ver · ◀▶ grupo · Amarillo ★ favorito · Atrás salir</div>
+    </aside>
+    <main id="stage">
+      <video id="video" autoplay></video>
+      <div id="osd"><span id="osd-num"></span><span id="osd-name"></span></div>
+      <div id="status">Cargando listas…</div>
+    </main>
+  </div>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

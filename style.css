@@ -1,0 +1,32 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0d1117; color: #e6edf3;
+  font-family: "SamsungOne", "Segoe UI", Helvetica, Arial, sans-serif; }
+#app { display: flex; width: 100%; height: 100%; }
+
+#side { width: 560px; height: 100%; background: #161b22; display: flex; flex-direction: column;
+  border-right: 2px solid #30363d; transition: margin-left .25s; }
+#tabs { display: flex; justify-content: space-between; align-items: center; padding: 28px 32px;
+  font-size: 34px; font-weight: 700; background: #1f2630; }
+#tab-prev, #tab-next { color: #7d8590; font-size: 26px; }
+#list { list-style: none; flex: 1; overflow: hidden; position: relative; }
+#list li { display: flex; align-items: center; height: 76px; padding: 0 28px; font-size: 30px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid #21262d; }
+#list li .n { width: 70px; color: #7d8590; font-size: 24px; flex: none; }
+#list li img { width: 72px; height: 48px; object-fit: contain; margin-right: 18px; flex: none; }
+#list li .t { overflow: hidden; text-overflow: ellipsis; }
+#list li .fav { color: #f2cc60; margin-left: 10px; }
+#list li.sel { background: #2f81f7; color: #fff; }
+#list li.sel .n { color: #dbe9ff; }
+#list li.playing .t { text-decoration: underline; }
+#help { padding: 18px 28px; font-size: 20px; color: #7d8590; background: #1f2630; }
+
+#stage { flex: 1; position: relative; background: #000; }
+#video { width: 100%; height: 100%; background: #000; }
+#status { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 36px;
+  color: #c9d1d9; text-align: center; max-width: 80%; }
+#osd { position: absolute; left: 40px; top: 40px; padding: 16px 28px; background: rgba(0,0,0,.65);
+  border-radius: 12px; font-size: 40px; display: none; }
+#osd-num { color: #2f81f7; margin-right: 18px; font-weight: 700; }
+
+#app.full #side { margin-left: -560px; }
+#app.full #osd.show { display: block; }
